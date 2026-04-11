@@ -1,25 +1,37 @@
 {
-  "name": "jobintel",
+  "name": "job-intel",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,css,json,md}\" --log-level warn",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ./ --fix --cache --cache-location .next/cache/.eslintcache",
+    "checks": "rimraf .next && npm i && concurrently --kill-others-on-fail \"npm run format\" \"npm run typecheck\" \"npm run lint\"",
+    "dev": "npm run checks && next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "next": "16.2.3",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@tailwindcss/upgrade": "^4.2.2",
+    "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
-    "eslint-config-next": "16.2.3",
+    "eslint-config-next": "^16.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-tailwindcss": "^4.0.0-beta.0",
+    "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "rimraf": "^6.1.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
