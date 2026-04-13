@@ -1,4 +1,12 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JobIntel
+
+JobIntel is a job intelligence dashboard that highlights the most posted jobs on Naukri and Indeed, along with premium insights for skills that are booming.
+
+## Features
+
+- Live keyword search that scrapes job listings from Naukri using authenticated Chrome session
+- Premium advantage insights to target high-converting services
+- API placeholders ready for live integrations
 
 ## Getting Started
 
@@ -6,83 +14,77 @@ First, run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-# JobIntel
-
-JobIntel is a job intelligence dashboard that highlights the most posted jobs on Naukri and Indeed, along with premium insights for skills that are booming.
-
-## Features
-
-- Live keyword search that scrapes the first 10 pages from Naukri
-- Indeed scraping placeholder (blocked by 403/CAPTCHA without a dedicated proxy)
-- Premium advantage insights to target high-converting services
-- API placeholders ready for live integrations
-
 ## Scraping Implementation
+
+### Prerequisites
+
+Before using the scraper, you need to:
+
+1. Install Playwright browsers:
+
+   ```bash
+   npx playwright install chromium
+   ```
+
+2. Launch Chrome with remote debugging enabled:
+
+   ```
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\Users\hithap\AppData\Local\Google\Chrome\User Data"
+   ```
+
+3. Ensure you're logged into Naukri in your Chrome profile
 
 ### API Route
 
-`GET /api/scrape?keyword=your+keyword` returns the first 10 result pages from each source:
+`GET /api/scrape` returns job listings from Naukri:
 
 ```json
 {
-  "keyword": "android",
+  "source": "Naukri",
+  "baseUrl": "https://www.naukri.com/software-developer-jobs?k=software+developer",
+  "pages": 3,
   "naukri": [
-    { "source": "Naukri", "page": 1, "listings": [/* ... */] }
+    {
+      "source": "Naukri",
+      "page": 1,
+      "listings": [
+        {
+          "title": "Software Developer",
+          "company": "Company Name",
+          "location": "Hyderabad",
+          "experience": "4-8 years",
+          "link": "https://www.naukri.com/job-listings-...",
+          "source": "Naukri",
+          "page": 1
+        }
+      ]
+    }
   ],
-  "indeed": [
-    { "source": "Indeed", "page": 1, "listings": [], "error": "Failed to fetch ... (403)" }
-  ]
+  "mostPosted": [{ "title": "software developer", "company": "", "count": 42 }]
 }
 ```
 
-### Naukri
+### How It Works
 
-- Naukri pages are fetched through the `r.jina.ai` proxy to avoid client-side rendering issues.
-- The response is markdown, so the scraper extracts job links/titles from markdown link patterns like:
-  `[Android Developer](https://www.naukri.com/job-listings-...)`.
+The scraper uses Playwright to connect to an already-running Chrome instance via CDP (Chrome DevTools Protocol):
 
-### Indeed
+1. Chrome is launched manually with `--remote-debugging-port=9222`
+2. The Next.js API route connects to Chrome using `chromium.connectOverCDP()`
+3. Uses the existing logged-in session to access Naukri
+4. Scrapes job listings from search results pages
+5. Returns aggregated results with most-posted job analysis
 
-- Direct requests to Indeed currently return a 403 (security check / CAPTCHA).
-- To enable Indeed scraping, you’ll need to wire in a paid scraping proxy or official API and update the request logic.
+### Limitation
 
-### UI
-
-The main page (`app/page.tsx`) provides a keyword search box and renders a summary plus sample listings.
-If a source fails (e.g., Indeed), the error is shown per-page in the summary panel.
+The scraper connects to an existing Chrome session - you must keep Chrome running with the debugging port open while using the scraper.
 
 ## Environment Variables (optional)
 
-Add the following to a `.env.local` file to point to real APIs when ready:
+Add the following to a `.env.local` file for future API integrations:
 
 ```bash
 NEXT_PUBLIC_NAUKRI_API_BASE_URL=https://api.naukri.example/v1
@@ -96,3 +98,4 @@ NEXT_PUBLIC_INDEED_API_KEY=your_indeed_key
 - Next.js (App Router)
 - React
 - Tailwind CSS
+- Playwright (for browser automation)

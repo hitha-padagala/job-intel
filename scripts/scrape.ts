@@ -1,12 +1,8 @@
 import { chromium, type Browser, type Page } from "playwright";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 const MAX_PAGES = 3;
 const NAUKRI_BASE_URL =
   "https://www.naukri.com/software-developer-jobs?k=software+developer";
-const CHROME_DEVTOOLS_PORT = 9222;
 
 type JobListing = {
   title: string;
@@ -38,69 +34,45 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
   let browser: Browser | null = null;
 
   try {
-    console.log("Connecting to Chrome via CDP...");
-    browser = await chromium.connectOverCDP(
-      `http://localhost:${CHROME_DEVTOOLS_PORT}`,
-    );
-    console.log("Connected to Chrome");
+    console.log("Launching new Chrome instance...");
+    browser = await chromium.launch({
+      headless: false,
+      args: ["--disable-blink-features=AutomationControlled"],
+    });
 
-    const pages = await browser.contexts()[0].pages();
-    let page = pages[0] || (await browser.newPage());
+    console.log("Browser launched, creating new page...");
+    const page: Page = await browser.newPage();
 
-    if (pages.length === 0) {
-      await page.goto("about:blank");
-    }
+    await page.goto("https://www.naukri.com/", {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+    console.log("Please log in manually if needed. Press Enter to continue...");
 
-    console.log("Current URL:", await page.url());
+    await new Promise((resolve) => {
+      process.stdin.once("data", resolve);
+    });
 
     for (let pageNumber = 1; pageNumber <= MAX_PAGES; pageNumber += 1) {
       try {
         const url = buildNaukriUrl(pageNumber);
         console.log(`Navigating to page ${pageNumber}: ${url}`);
 
-        try {
-          await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
-        } catch (gotoError) {
-          console.log("Navigation aborted, retrying with load...");
-          await page.goto(url, { waitUntil: "load", timeout: 60000 });
-          await page.waitForLoadState("networkidle").catch(() => {});
-        }
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await page.waitForSelector(".jobTuple", { timeout: 30000 });
 
-        const html = await page.content();
-        console.log(`Page ${pageNumber} HTML sample:`, html.slice(0, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const hasJobTuple = await page.locator(".jobTuple").count();
-        const hasCustJobTuple = await page.locator(".cust-job-tuple").count();
-        const hasListing = await page.locator(".listing-card").count();
-        console.log(
-          `Selectors found - .jobTuple: ${hasJobTuple}, .cust-job-tuple: ${hasCustJobTuple}, .listing-card: ${hasListing}`,
-        );
-
-        let selector = ".jobTuple";
-        if (hasJobTuple === 0 && hasCustJobTuple > 0)
-          selector = ".cust-job-tuple";
-        else if (hasJobTuple === 0 && hasListing > 0)
-          selector = ".listing-card";
-
-        if (hasJobTuple === 0 && hasCustJobTuple === 0 && hasListing === 0) {
-          console.log("No job listings found on page");
-          results.push({
-            source: "Naukri",
-            page: pageNumber,
-            listings: [],
-            error: "No job listings found",
-          });
-          continue;
-        }
-
-        const listings = await page.evaluate((sel) => {
-          const cards = document.querySelectorAll(sel);
+        const listings = await page.evaluate(() => {
+          const cards = document.querySelectorAll(".jobTuple");
           return Array.from(cards)
             .map((card) => {
               const titleEl = card.querySelector(
                 ".title",
+              ) as HTMLElement | null;
+              const companyEl = card.querySelector(
+                ".companyInfo .name",
               ) as HTMLElement | null;
               const locEl = card.querySelector(
                 ".location",
@@ -111,12 +83,6 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
               const linkEl = card.querySelector(
                 ".title",
               ) as HTMLAnchorElement | null;
-              const companyEl = card.querySelector(
-                ".companyInfo",
-              ) as HTMLElement | null;
-
-              const allText = card.innerText;
-              console.log("Card text:", allText);
 
               return {
                 title: titleEl?.innerText?.trim() ?? "",
@@ -127,7 +93,7 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
               };
             })
             .filter((job) => job.title);
-        }, selector);
+        });
 
         results.push({
           source: "Naukri",
@@ -178,26 +144,22 @@ const buildMostPosted = (listings: JobListing[]) => {
     .slice(0, 20);
 };
 
-export async function GET() {
-  try {
-    const naukri = await scrapeNaukri();
+scrapeNaukri()
+  .then((naukri) => {
     const flattened = naukri.flatMap((page) => page.listings);
     const mostPosted = buildMostPosted(flattened);
 
-    return Response.json({
+    const output = {
       source: "Naukri",
       baseUrl: NAUKRI_BASE_URL,
       pages: MAX_PAGES,
       naukri,
       mostPosted,
-    });
-  } catch (error) {
+    };
+
+    console.log(JSON.stringify(output, null, 2));
+  })
+  .catch((error) => {
     console.error("Scrape error:", error);
-    return Response.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
-  }
-}
+    process.exit(1);
+  });

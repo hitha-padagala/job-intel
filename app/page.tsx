@@ -19,9 +19,15 @@ type ScrapePage = {
 };
 
 type ScrapeResponse = {
-  keyword: string;
+  source: string;
+  baseUrl: string;
+  pages: number;
   naukri: ScrapePage[];
-  indeed: ScrapePage[];
+  mostPosted: {
+    title: string;
+    company: string;
+    count: number;
+  }[];
 };
 
 const premiumSignals = [
@@ -70,26 +76,16 @@ export default function Home() {
       return [] as JobListing[];
     }
 
-    return [...response.naukri, ...response.indeed].flatMap(
-      (page) => page.listings,
-    );
+    return response.naukri.flatMap((page) => page.listings);
   }, [response]);
 
   const handleSearch = async () => {
-    const trimmed = keyword.trim();
-    if (!trimmed) {
-      setError("Please enter a keyword to search.");
-      return;
-    }
-
     setLoading(true);
     setError(null);
     setResponse(null);
 
     try {
-      const res = await fetch(
-        `/api/scrape?keyword=${encodeURIComponent(trimmed)}`,
-      );
+      const res = await fetch("/api/scrape");
       if (!res.ok) {
         throw new Error("Scrape failed. Please try again.");
       }
@@ -124,7 +120,7 @@ export default function Home() {
             </p>
             <p className="text-lg font-semibold">Search Naukri + Indeed</p>
             <p className="text-sm text-slate-400">
-              Pull the first 10 pages for a keyword in real time.
+              Scrape the first 10 pages from your logged-in Naukri session.
             </p>
           </div>
         </div>
@@ -136,15 +132,15 @@ export default function Home() {
             <div>
               <h2 className="text-xl font-semibold">Live job search</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Enter a keyword to scrape the first 10 pages from Naukri and
-                Indeed.
+                Use your logged-in Chrome profile to pull the first 10 pages
+                from Naukri.
               </p>
             </div>
             <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
               <input
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
-                placeholder="e.g. data analyst"
+                placeholder="(fixed to software developer search)"
                 className="w-full rounded-full border border-white/10 bg-slate-950/60 px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/60"
               />
               <button
@@ -164,10 +160,10 @@ export default function Home() {
                   Summary
                 </p>
                 <p className="mt-2 text-sm text-slate-300">
-                  {response.keyword} • {flattened.length} listings scraped
+                  {response.source} • {flattened.length} listings scraped
                 </p>
                 <div className="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
-                  {[...response.naukri, ...response.indeed].map((page) => (
+                  {response.naukri.map((page) => (
                     <div
                       key={`${page.source}-${page.page}`}
                       className="rounded-xl border border-white/10 bg-white/5 p-3"
@@ -186,27 +182,24 @@ export default function Home() {
               </div>
               <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                  First 15 listings
+                  Most posted jobs
                 </p>
                 <div className="mt-3 grid gap-3 text-sm text-slate-300">
-                  {flattened.slice(0, 15).map((listing, index) => (
+                  {response.mostPosted.map((item) => (
                     <div
-                      key={`${listing.source}-${listing.page}-${index}`}
+                      key={`${item.title}-${item.company}`}
                       className="rounded-xl border border-white/10 bg-white/5 p-3"
                     >
-                      <p className="font-semibold text-white">
-                        {listing.title}
-                      </p>
+                      <p className="font-semibold text-white">{item.title}</p>
                       <p className="text-xs text-slate-400">
-                        {listing.company || "Unknown company"} •{" "}
-                        {listing.location || "Unknown location"}
+                        {item.company || "Unknown company"}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {listing.source} • Page {listing.page}
+                        {item.count} postings across pages
                       </p>
                     </div>
                   ))}
-                  {flattened.length === 0 ? (
+                  {response.mostPosted.length === 0 ? (
                     <p className="text-sm text-slate-500">
                       No listings captured yet.
                     </p>
@@ -234,9 +227,9 @@ export default function Home() {
                   Sources
                 </p>
                 <p className="mt-2">
-                  Scraping targets the first 10 pages on Naukri and Indeed. Some
-                  pages may block automated requests, so we surface errors per
-                  page in the results summary.
+                  Scraping targets the first 10 pages on Naukri using your
+                  logged-in Chrome profile. Errors are surfaced per page in the
+                  results summary.
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
