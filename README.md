@@ -2,6 +2,11 @@
 
 JobIntel is a job intelligence dashboard that highlights the most posted jobs on Naukri and Indeed, along with premium insights for skills that are booming.
 
+## Latest UI touch-up
+
+- Improved landing-page visual depth with a smoother dark gradient background.
+- Clarified search input placeholder copy for better first-use guidance.
+
 ## Features
 
 - Live keyword search that scrapes job listings from Naukri using authenticated Chrome session
