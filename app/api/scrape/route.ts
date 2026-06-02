@@ -45,7 +45,7 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
     console.log("Connected to Chrome");
 
     const pages = await browser.contexts()[0].pages();
-    let page = pages[0] || (await browser.newPage());
+    const page = pages[0] || (await browser.newPage());
 
     if (pages.length === 0) {
       await page.goto("about:blank");
@@ -99,6 +99,7 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
           const cards = document.querySelectorAll(sel);
           return Array.from(cards)
             .map((card) => {
+              const cardEl = card as HTMLElement;
               const titleEl = card.querySelector(
                 ".title",
               ) as HTMLElement | null;
@@ -115,7 +116,7 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
                 ".companyInfo",
               ) as HTMLElement | null;
 
-              const allText = card.innerText;
+              const allText = cardEl.innerText;
               console.log("Card text:", allText);
 
               return {
