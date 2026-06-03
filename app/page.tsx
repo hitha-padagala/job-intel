@@ -22,6 +22,7 @@ type ScrapeResponse = {
   source: string;
   baseUrl: string;
   pages: number;
+  keyword: string;
   naukri: ScrapePage[];
   mostPosted: {
     title: string;
@@ -80,12 +81,13 @@ export default function Home() {
   }, [response]);
 
   const handleSearch = async () => {
+    const query = keyword.trim() || "software developer";
     setLoading(true);
     setError(null);
     setResponse(null);
 
     try {
-      const res = await fetch("/api/scrape");
+      const res = await fetch(`/api/scrape?keyword=${encodeURIComponent(query)}`);
       if (!res.ok) {
         throw new Error("Scrape failed. Please try again.");
       }
@@ -95,6 +97,12 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && !loading) {
+      void handleSearch();
     }
   };
 
@@ -140,6 +148,7 @@ export default function Home() {
               <input
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Software developer (default query)"
                 className="w-full rounded-full border border-white/10 bg-slate-950/60 px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/60"
               />
@@ -152,7 +161,11 @@ export default function Home() {
               </button>
             </div>
           </div>
-          {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
+          {error ? (
+            <p className="mt-4 text-sm text-rose-300" role="alert">
+              {error}
+            </p>
+          ) : null}
           {response ? (
             <div className="mt-6 grid gap-4 lg:grid-cols-[1.5fr,1fr]">
               <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">

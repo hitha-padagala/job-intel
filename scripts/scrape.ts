@@ -1,8 +1,7 @@
 import { chromium, type Browser, type Page } from "playwright";
 
 const MAX_PAGES = 3;
-const NAUKRI_BASE_URL =
-  "https://www.naukri.com/software-developer-jobs?k=software+developer";
+const keyword = process.argv[2]?.trim() || "software developer";
 
 type JobListing = {
   title: string;
@@ -21,11 +20,15 @@ type ScrapeResult = {
   error?: string;
 };
 
-const buildNaukriUrl = (page: number) => {
+const buildNaukriUrl = (searchTerm: string, page: number) => {
+  const slug = encodeURIComponent(searchTerm.trim().replace(/\s+/g, "-"));
+  const query = encodeURIComponent(searchTerm.trim()).replace(/%20/g, "+");
+  const baseUrl = `https://www.naukri.com/${slug}-jobs?k=${query}`;
+
   if (page === 1) {
-    return NAUKRI_BASE_URL;
+    return baseUrl;
   }
-  return `${NAUKRI_BASE_URL}&pageNo=${page}`;
+  return `${baseUrl}&pageNo=${page}`;
 };
 
 const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
@@ -55,7 +58,7 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
 
     for (let pageNumber = 1; pageNumber <= MAX_PAGES; pageNumber += 1) {
       try {
-        const url = buildNaukriUrl(pageNumber);
+        const url = buildNaukriUrl(keyword, pageNumber);
         console.log(`Navigating to page ${pageNumber}: ${url}`);
 
         await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -151,7 +154,8 @@ scrapeNaukri()
 
     const output = {
       source: "Naukri",
-      baseUrl: NAUKRI_BASE_URL,
+      keyword,
+      baseUrl: buildNaukriUrl(keyword, 1),
       pages: MAX_PAGES,
       naukri,
       mostPosted,

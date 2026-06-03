@@ -4,8 +4,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_PAGES = 3;
-const NAUKRI_BASE_URL =
-  "https://www.naukri.com/software-developer-jobs?k=software+developer";
 const CHROME_DEVTOOLS_PORT = 9222;
 
 type JobListing = {
@@ -25,14 +23,19 @@ type ScrapeResult = {
   error?: string;
 };
 
-const buildNaukriUrl = (page: number) => {
+const buildNaukriUrl = (keyword: string, page: number) => {
+  const normalized = keyword.trim().replace(/\s+/g, " ");
+  const slug = normalized.toLowerCase().replace(/\s+/g, "-");
+  const query = encodeURIComponent(normalized).replace(/%20/g, "+");
+  const baseUrl = `https://www.naukri.com/${slug}-jobs?k=${query}`;
+
   if (page === 1) {
-    return NAUKRI_BASE_URL;
+    return baseUrl;
   }
-  return `${NAUKRI_BASE_URL}&pageNo=${page}`;
+  return `${baseUrl}&pageNo=${page}`;
 };
 
-const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
+const scrapeNaukri = async (keyword: string): Promise<ScrapeResult[]> => {
   const results: ScrapeResult[] = [];
 
   let browser: Browser | null = null;
@@ -55,7 +58,7 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
 
     for (let pageNumber = 1; pageNumber <= MAX_PAGES; pageNumber += 1) {
       try {
-        const url = buildNaukriUrl(pageNumber);
+        const url = buildNaukriUrl(keyword, pageNumber);
         console.log(`Navigating to page ${pageNumber}: ${url}`);
 
         try {
@@ -78,13 +81,16 @@ const scrapeNaukri = async (): Promise<ScrapeResult[]> => {
           `Selectors found - .jobTuple: ${hasJobTuple}, .cust-job-tuple: ${hasCustJobTuple}, .listing-card: ${hasListing}`,
         );
 
-        let selector = ".jobTuple";
-        if (hasJobTuple === 0 && hasCustJobTuple > 0)
-          selector = ".cust-job-tuple";
-        else if (hasJobTuple === 0 && hasListing > 0)
-          selector = ".listing-card";
+        const selector =
+          hasJobTuple > 0
+            ? ".jobTuple"
+            : hasCustJobTuple > 0
+              ? ".cust-job-tuple"
+              : hasListing > 0
+                ? ".listing-card"
+                : "";
 
-        if (hasJobTuple === 0 && hasCustJobTuple === 0 && hasListing === 0) {
+        if (!selector) {
           console.log("No job listings found on page");
           results.push({
             source: "Naukri",
@@ -179,24 +185,33 @@ const buildMostPosted = (listings: JobListing[]) => {
     .slice(0, 20);
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const naukri = await scrapeNaukri();
+    const requestUrl = new URL(request.url);
+    const keyword = requestUrl.searchParams.get("keyword")?.trim() || "software developer";
+    const naukri = await scrapeNaukri(keyword);
     const flattened = naukri.flatMap((page) => page.listings);
     const mostPosted = buildMostPosted(flattened);
 
     return Response.json({
       source: "Naukri",
-      baseUrl: NAUKRI_BASE_URL,
+      keyword,
+      baseUrl: buildNaukriUrl(keyword, 1),
       pages: MAX_PAGES,
       naukri,
       mostPosted,
     });
   } catch (error) {
     console.error("Scrape error:", error);
+    const message =
+      error instanceof Error && /localhost:9222|ECONNREFUSED|connect/i.test(error.message)
+        ? "Could not connect to Chrome on port 9222. Start Chrome with remote debugging enabled, then try again."
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
     return Response.json(
       {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: message,
       },
       { status: 500 },
     );
